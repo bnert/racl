@@ -1,0 +1,11 @@
+version: 1
+packages:
+  - name: "racl_repo"
+    path: "internal/racl_repo"
+    engine: "postgresql"
+    sql_package: "pgx/v4"
+    queries: "./sql/queries/"
+    schema: "./sql/schema/"
+    emit_json_tags: true
+    json_tags_case_style: "camel"
+
