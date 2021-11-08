@@ -17,9 +17,9 @@ RETURNING *;
 
 -- name: GetAclForResourceByEntity :one
 SELECT
-  acl.capabilities
+  *
 FROM
-   racl_acls as acl
+  racl_acls as acl
 WHERE
   acl.entity = $1
   AND acl.resource_id = $2;

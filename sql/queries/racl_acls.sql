@@ -1,25 +1,32 @@
 -- name: CreateAcl :one
-INSERT INTO racl_acls (
+insert into racl_acls (
   resource_id, entity, capabilities
-) VALUES (
+) values (
   $1, $2, $3
-) RETURNING *;
+) returning *;
 
 -- name: CreateDefaultAcl :one
-INSERT INTO racl_acls (
+insert into racl_acls (
   resource_id, entity, capabilities
-) VALUES (
+) values (
   $1, $2, '{"c", "r", "u", "d", "a"}'
-) RETURNING *;
+) returning *;
+
+-- name: GetAclByEntity :one
+select *
+from racl_acls
+where entity = $1;
 
 -- name: UpdateAclCapabilities :one
-UPDATE racl_acls
-SET capabilities = $2
-WHERE id = $1
-RETURNING *;
+update racl_acls
+set capabilities = $2
+where entity = $1
+returning *;
 
 -- name: DeleteAcl :one
-DELETE FROM racl_acls
-WHERE id = $1
-RETURNING *;
+delete from racl_acls
+where
+  entity = $1
+  and resource_id = $2
+returning *;
 

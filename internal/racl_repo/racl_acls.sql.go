@@ -5,16 +5,14 @@ package racl_repo
 
 import (
 	"context"
-
-	"github.com/google/uuid"
 )
 
 const createAcl = `-- name: CreateAcl :one
-INSERT INTO racl_acls (
+insert into racl_acls (
   resource_id, entity, capabilities
-) VALUES (
+) values (
   $1, $2, $3
-) RETURNING id, created_at, updated_at, resource_id, entity, capabilities
+) returning id, created_at, updated_at, resource_id, entity, capabilities
 `
 
 type CreateAclParams struct {
@@ -38,11 +36,11 @@ func (q *Queries) CreateAcl(ctx context.Context, arg CreateAclParams) (RaclAcl, 
 }
 
 const createDefaultAcl = `-- name: CreateDefaultAcl :one
-INSERT INTO racl_acls (
+insert into racl_acls (
   resource_id, entity, capabilities
-) VALUES (
+) values (
   $1, $2, '{"c", "r", "u", "d", "a"}'
-) RETURNING id, created_at, updated_at, resource_id, entity, capabilities
+) returning id, created_at, updated_at, resource_id, entity, capabilities
 `
 
 type CreateDefaultAclParams struct {
@@ -65,13 +63,40 @@ func (q *Queries) CreateDefaultAcl(ctx context.Context, arg CreateDefaultAclPara
 }
 
 const deleteAcl = `-- name: DeleteAcl :one
-DELETE FROM racl_acls
-WHERE id = $1
-RETURNING id, created_at, updated_at, resource_id, entity, capabilities
+delete from racl_acls
+where
+  entity = $1
+  and resource_id = $2
+returning id, created_at, updated_at, resource_id, entity, capabilities
 `
 
-func (q *Queries) DeleteAcl(ctx context.Context, id uuid.UUID) (RaclAcl, error) {
-	row := q.db.QueryRow(ctx, deleteAcl, id)
+type DeleteAclParams struct {
+	Entity     string `json:"entity"`
+	ResourceID string `json:"resourceID"`
+}
+
+func (q *Queries) DeleteAcl(ctx context.Context, arg DeleteAclParams) (RaclAcl, error) {
+	row := q.db.QueryRow(ctx, deleteAcl, arg.Entity, arg.ResourceID)
+	var i RaclAcl
+	err := row.Scan(
+		&i.ID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.ResourceID,
+		&i.Entity,
+		&i.Capabilities,
+	)
+	return i, err
+}
+
+const getAclByEntity = `-- name: GetAclByEntity :one
+select id, created_at, updated_at, resource_id, entity, capabilities
+from racl_acls
+where entity = $1
+`
+
+func (q *Queries) GetAclByEntity(ctx context.Context, entity string) (RaclAcl, error) {
+	row := q.db.QueryRow(ctx, getAclByEntity, entity)
 	var i RaclAcl
 	err := row.Scan(
 		&i.ID,
@@ -85,19 +110,19 @@ func (q *Queries) DeleteAcl(ctx context.Context, id uuid.UUID) (RaclAcl, error) 
 }
 
 const updateAclCapabilities = `-- name: UpdateAclCapabilities :one
-UPDATE racl_acls
-SET capabilities = $2
-WHERE id = $1
-RETURNING id, created_at, updated_at, resource_id, entity, capabilities
+update racl_acls
+set capabilities = $2
+where entity = $1
+returning id, created_at, updated_at, resource_id, entity, capabilities
 `
 
 type UpdateAclCapabilitiesParams struct {
-	ID           uuid.UUID `json:"id"`
-	Capabilities []string  `json:"capabilities"`
+	Entity       string   `json:"entity"`
+	Capabilities []string `json:"capabilities"`
 }
 
 func (q *Queries) UpdateAclCapabilities(ctx context.Context, arg UpdateAclCapabilitiesParams) (RaclAcl, error) {
-	row := q.db.QueryRow(ctx, updateAclCapabilities, arg.ID, arg.Capabilities)
+	row := q.db.QueryRow(ctx, updateAclCapabilities, arg.Entity, arg.Capabilities)
 	var i RaclAcl
 	err := row.Scan(
 		&i.ID,

@@ -37,9 +37,9 @@ func (q *Queries) DeleteResource(ctx context.Context, id string) (RaclResource, 
 
 const getAclForResourceByEntity = `-- name: GetAclForResourceByEntity :one
 SELECT
-  acl.capabilities
+  id, created_at, updated_at, resource_id, entity, capabilities
 FROM
-   racl_acls as acl
+  racl_acls as acl
 WHERE
   acl.entity = $1
   AND acl.resource_id = $2
@@ -50,11 +50,18 @@ type GetAclForResourceByEntityParams struct {
 	ResourceID string `json:"resourceID"`
 }
 
-func (q *Queries) GetAclForResourceByEntity(ctx context.Context, arg GetAclForResourceByEntityParams) ([]string, error) {
+func (q *Queries) GetAclForResourceByEntity(ctx context.Context, arg GetAclForResourceByEntityParams) (RaclAcl, error) {
 	row := q.db.QueryRow(ctx, getAclForResourceByEntity, arg.Entity, arg.ResourceID)
-	var capabilities []string
-	err := row.Scan(&capabilities)
-	return capabilities, err
+	var i RaclAcl
+	err := row.Scan(
+		&i.ID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.ResourceID,
+		&i.Entity,
+		&i.Capabilities,
+	)
+	return i, err
 }
 
 const getResource = `-- name: GetResource :one

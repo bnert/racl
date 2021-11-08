@@ -35,10 +35,10 @@ func Router(pool *pgxpool.Pool) chi.Router {
     r.Use(attachDbPool(pool))
 
     r.Route("/acl", func(r chi.Router) {
-        r.Get("/{entityId}", handler(getResource))
-        r.Post("/", handler(createResource))
-        r.Put("/{entityId}", handler(updateResource))
-        r.Delete("/{entityId}", handler(deleteResource))
+        r.Get("/{entityId}", handler(getAcl))
+        r.Post("/", handler(createAcl))
+        r.Put("/{entityId}", handler(updateAcl))
+        r.Delete("/{entityId}", handler(deleteAcl))
     })
 
     return r
