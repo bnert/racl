@@ -6,6 +6,7 @@ import (
     "encoding/json"
     "net/http"
     "github.com/go-chi/chi/v5"
+    "github.com/jackc/pgx/v4/pgxpool"
     repo "github.com/bnert/racl/internal/racl_repo"
 )
 
@@ -24,15 +25,15 @@ func getAcl(w http.ResponseWriter, r *http.Request) (int, data) {
     }
     defer conn.Release()
 
-    acl, err := repo.New(conn).GetAclForResourceByEntity(
+    acl, err := repo.New(conn).GetAclByEntityAndResource(
         context.Background(),
-        repo.GetAclForResourceByEntityParams{
+        repo.GetAclByEntityAndResourceParams{
             Entity: entityId,
             ResourceID: resourceId,
         },
     )
     if err != nil {
-        return 404, data{"error": "Unable to find entity/resource acl"}
+        return 404, data{"error": "Unable to find entity/resource acl."}
     }
 
     return 200, data{
@@ -40,12 +41,6 @@ func getAcl(w http.ResponseWriter, r *http.Request) (int, data) {
             "capabilities": acl.Capabilities,
         },
     }
-}
-
-type createAclBody struct {
-    Resource     string `json:"resource"`
-    Entity       string `json:"entity"`
-    Capabilities *[]string `json:"capabilities, omitempty"`
 }
 
 func createAcl(w http.ResponseWriter, r *http.Request) (int, data) {
@@ -82,6 +77,16 @@ func createAcl(w http.ResponseWriter, r *http.Request) (int, data) {
         Entity: body.Entity,
         Capabilities: capabilities,
     })
+    if err != nil {
+        return 202, data{
+            "data": data{
+                "resourceID": acl.ResourceID,
+                "entity": nil,
+                "capabilities": []string{},
+            },
+            "error": "Unable to create acl. Retry operation.",
+        }
+    }
 
     return 201, data{
         "data": data{
@@ -92,13 +97,52 @@ func createAcl(w http.ResponseWriter, r *http.Request) (int, data) {
     }
 }
 
-type UpdateBody struct {
-    Resource     string    `json:"resource"`
-    Capabilities *[]string `json:"capabilities, omitempty"`
+func createResourceAndAttachAcl(conn *pgxpool.Conn, entityId string, body *updateAclBody) (int, data) {
+    q := repo.New(conn)
+
+    _, err := q.CreateResource(
+        context.Background(),
+        body.Resource,
+    )
+    if err != nil {
+        return 400, data{"error": err.Error()}
+    }
+
+    capabilities := []string{"c", "r", "u", "d", "a"}
+    if body.Capabilities != nil {
+        capabilities = *body.Capabilities
+    }
+
+    acl, err := q.CreateAcl(
+        context.Background(),
+        repo.CreateAclParams{
+            ResourceID: body.Resource,
+            Entity: entityId,
+            Capabilities: capabilities,
+        },
+    )
+    if err != nil {
+        return 202, data{
+            "data": data{
+                "resourceID": acl.ResourceID,
+                "entity": nil,
+                "capabilities": []string{},
+            },
+            "error": "Unable to create acl. Retry operation.",
+        }
+    }
+
+    return 201, data{
+        "data": data{
+            "resourceID": acl.ResourceID,
+            "entity": acl.Entity,
+            "capabilities": acl.Capabilities,
+        },
+    }
 }
 
 func updateAcl(w http.ResponseWriter, r *http.Request) (int, data) {
-    var body UpdateBody 
+    var body updateAclBody
     err := json.NewDecoder(r.Body).Decode(&body)
     if err != nil {
         fmt.Println(err.Error())
@@ -114,15 +158,15 @@ func updateAcl(w http.ResponseWriter, r *http.Request) (int, data) {
     entityId := chi.URLParam(r, "entityId")
     q := repo.New(conn)
 
-    existingAcl, err := q.GetAclForResourceByEntity(
+    existingAcl, err := q.GetAclByEntityAndResource(
         context.Background(),
-        repo.GetAclForResourceByEntityParams{
+        repo.GetAclByEntityAndResourceParams{
             ResourceID: body.Resource,
             Entity: entityId,
         },
     )
     if err != nil {
-        return 404, data{"error": "entity not found"}
+        return createResourceAndAttachAcl(conn, entityId, &body)
     }
 
     if body.Capabilities == nil {
@@ -135,11 +179,14 @@ func updateAcl(w http.ResponseWriter, r *http.Request) (int, data) {
         }
     }
 
+    fmt.Println("CAPA", *body.Capabilities)
+
     updateAcl, err := q.UpdateAclCapabilities(
         context.Background(),
         repo.UpdateAclCapabilitiesParams{
             Entity: existingAcl.Entity,
             Capabilities: *body.Capabilities,
+            ResourceID: existingAcl.ResourceID,
         },
     )
     if err != nil {

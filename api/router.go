@@ -25,14 +25,21 @@ func ctxDbConn(r *http.Request) (*pgxpool.Conn, error) {
     return pool.Acquire(context.Background())
 }
 
+func getUserMap(pool *pgxpool.Pool) map[string]string {
+    return map[string]string{"bnert": "bnert"}
+}
+
 func Router(pool *pgxpool.Pool) chi.Router {
     r := chi.NewRouter()
 
     r.Use(middleware.RequestID)
     r.Use(middleware.RealIP)
     r.Use(middleware.Logger)
+    r.Use(middleware.Recoverer)
 
     r.Use(attachDbPool(pool))
+
+    r.Use(middleware.BasicAuth("racl", getUserMap(pool)))
 
     r.Route("/acl", func(r chi.Router) {
         r.Get("/{entityId}", handler(getAcl))
@@ -41,6 +48,11 @@ func Router(pool *pgxpool.Pool) chi.Router {
         r.Delete("/{entityId}", handler(deleteAcl))
     })
 
+    r.Route("/resource", func(r chi.Router) {
+        r.Get("/{resourceId}", handler(getResource))
+        r.Put("/{resourceId}", handler(createResource))
+        r.Delete("/{resourceId}", handler(deleteResource))
+    })
     return r
 }
 

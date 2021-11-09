@@ -90,9 +90,12 @@ func (q *Queries) DeleteAcl(ctx context.Context, arg DeleteAclParams) (RaclAcl, 
 }
 
 const getAclByEntity = `-- name: GetAclByEntity :one
-select id, created_at, updated_at, resource_id, entity, capabilities
-from racl_acls
-where entity = $1
+select
+  id, created_at, updated_at, resource_id, entity, capabilities
+from
+  racl_acls
+where
+  entity = $1
 `
 
 func (q *Queries) GetAclByEntity(ctx context.Context, entity string) (RaclAcl, error) {
@@ -109,20 +112,54 @@ func (q *Queries) GetAclByEntity(ctx context.Context, entity string) (RaclAcl, e
 	return i, err
 }
 
+const getAclByEntityAndResource = `-- name: GetAclByEntityAndResource :one
+select
+  id, created_at, updated_at, resource_id, entity, capabilities
+from
+  racl_acls
+where
+  entity = $1
+  and resource_id = $2
+`
+
+type GetAclByEntityAndResourceParams struct {
+	Entity     string `json:"entity"`
+	ResourceID string `json:"resourceID"`
+}
+
+func (q *Queries) GetAclByEntityAndResource(ctx context.Context, arg GetAclByEntityAndResourceParams) (RaclAcl, error) {
+	row := q.db.QueryRow(ctx, getAclByEntityAndResource, arg.Entity, arg.ResourceID)
+	var i RaclAcl
+	err := row.Scan(
+		&i.ID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.ResourceID,
+		&i.Entity,
+		&i.Capabilities,
+	)
+	return i, err
+}
+
 const updateAclCapabilities = `-- name: UpdateAclCapabilities :one
-update racl_acls
-set capabilities = $2
-where entity = $1
+update
+  racl_acls
+set
+  capabilities = $3
+where
+  entity = $1
+  and resource_id = $2
 returning id, created_at, updated_at, resource_id, entity, capabilities
 `
 
 type UpdateAclCapabilitiesParams struct {
 	Entity       string   `json:"entity"`
+	ResourceID   string   `json:"resourceID"`
 	Capabilities []string `json:"capabilities"`
 }
 
 func (q *Queries) UpdateAclCapabilities(ctx context.Context, arg UpdateAclCapabilitiesParams) (RaclAcl, error) {
-	row := q.db.QueryRow(ctx, updateAclCapabilities, arg.Entity, arg.Capabilities)
+	row := q.db.QueryRow(ctx, updateAclCapabilities, arg.Entity, arg.ResourceID, arg.Capabilities)
 	var i RaclAcl
 	err := row.Scan(
 		&i.ID,

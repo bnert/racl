@@ -1,26 +1,17 @@
 -- name: GetResource :one
-SELECT *
-FROM racl_resources
-WHERE id = $1;
+select *
+from racl_resources
+where id = $1;
 
 -- name: CreateResource :one
-INSERT INTO racl_resources (
+insert into racl_resources (
   id  
-) VALUES (
+) values (
   $1
-) RETURNING *;
+) returning *;
 
 -- name: DeleteResource :one
-DELETE FROM racl_resources
-WHERE id = $1
-RETURNING *;
-
--- name: GetAclForResourceByEntity :one
-SELECT
-  *
-FROM
-  racl_acls as acl
-WHERE
-  acl.entity = $1
-  AND acl.resource_id = $2;
+delete from racl_resources
+where id = $1
+returning *;
 
